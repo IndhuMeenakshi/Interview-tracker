@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useActionState } from 'react';
+import React, { useEffect, useActionState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import type { Job, InterviewStage } from '@/lib/types';
+import type { Job } from '@/lib/types';
 import { extractOfferInfo, type FormState } from '@/lib/actions';
 import {
   Card,
@@ -38,17 +38,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { StageIcon } from '@/components/stage-icon';
 import { SubmitButton } from '@/components/submit-button';
-import { MoreVertical, Trash2, CalendarIcon, ClipboardPaste, Info, Briefcase, MapPin, Package, FileText } from 'lucide-react';
+import { MoreVertical, Trash2, ClipboardPaste, Info, Briefcase, MapPin, Package, FileText } from 'lucide-react';
 
 interface InterviewCardProps {
   job: Job;
@@ -56,19 +53,8 @@ interface InterviewCardProps {
   onDelete: (id: string) => void;
 }
 
-const stageSchema = z.object({
-  name: z.string().min(3, 'Stage name is required'),
-  date: z.date({ required_error: 'A date is required.' }),
-  result: z.string().optional(),
-});
-
 export function InterviewCard({ job, onUpdate, onDelete }: InterviewCardProps) {
   const { toast } = useToast();
-  const [isStageFormOpen, setIsStageFormOpen] = useState(false);
-  const stageForm = useForm<z.infer<typeof stageSchema>>({
-    resolver: zodResolver(stageSchema),
-    defaultValues: { name: '', result: '' },
-  });
 
   const initialState: FormState = { data: null, message: '' };
   const [state, formAction] = useActionState(extractOfferInfo, initialState);
@@ -84,19 +70,6 @@ export function InterviewCard({ job, onUpdate, onDelete }: InterviewCardProps) {
     onUpdate({ id: job.id, status });
   };
   
-  function onAddStage(values: z.infer<typeof stageSchema>) {
-    const newStage: InterviewStage = {
-      id: Date.now().toString(),
-      name: values.name,
-      date: values.date.toISOString(),
-      result: values.result,
-    };
-    const updatedStages = [...job.stages, newStage].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    onUpdate({ id: job.id, stages: updatedStages });
-    stageForm.reset({name: "", result: ""});
-    setIsStageFormOpen(false);
-  }
-
   useEffect(() => {
     if (state?.message === 'success' && state.data) {
       const offerLetterUrl = (document.querySelector(`form[data-job-id="${job.id}"] input[name="offerLetterUrl"]`) as HTMLInputElement)?.value;
@@ -113,10 +86,6 @@ export function InterviewCard({ job, onUpdate, onDelete }: InterviewCardProps) {
       });
     }
   }, [state, job.id, onUpdate, toast]);
-
-  const sortedStages = useMemo(() => {
-    return [...job.stages].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [job.stages]);
 
   return (
     <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg">
@@ -166,57 +135,8 @@ export function InterviewCard({ job, onUpdate, onDelete }: InterviewCardProps) {
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-4">
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-1">
-            <AccordionTrigger className="text-sm font-semibold">
-              Interview Stages ({job.stages.length})
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-4 pt-2">
-                {sortedStages.map(stage => (
-                  <div key={stage.id} className="flex items-start gap-3">
-                    <StageIcon stageName={stage.name} className="h-5 w-5 mt-1 text-muted-foreground" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{stage.name}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(stage.date), 'PPP')}</p>
-                      {stage.result && <p className="text-xs text-muted-foreground mt-1">Result: {stage.result}</p>}
-                    </div>
-                  </div>
-                ))}
-                
-                <form onSubmit={stageForm.handleSubmit(onAddStage)} className="space-y-3 rounded-lg border bg-secondary/50 p-3">
-                  <Input placeholder="New stage name" {...stageForm.register('name')} />
-                  {stageForm.formState.errors.name && <p className="text-xs text-destructive">{stageForm.formState.errors.name.message}</p>}
-                   <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !stageForm.watch('date') && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {stageForm.watch('date') ? format(stageForm.watch('date'), "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={stageForm.watch('date')}
-                        onSelect={(date) => stageForm.setValue('date', date as Date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {stageForm.formState.errors.date && <p className="text-xs text-destructive">{stageForm.formState.errors.date.message}</p>}
-                  <Input placeholder="Round result (optional)" {...stageForm.register('result')} />
-                  <Button type="submit" size="sm" className="w-full">Add Stage</Button>
-                </form>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-          {job.offerLetterUrl && (
+        {job.offerLetterUrl && (
+          <Accordion type="single" collapsible>
             <AccordionItem value="item-2">
               <AccordionTrigger className="text-sm font-semibold">Documents</AccordionTrigger>
               <AccordionContent>
@@ -226,8 +146,8 @@ export function InterviewCard({ job, onUpdate, onDelete }: InterviewCardProps) {
                 </a>
               </AccordionContent>
             </AccordionItem>
-          )}
-        </Accordion>
+          </Accordion>
+        )}
         
         {job.status === 'Offer' && (
           <div className="border-t pt-4">

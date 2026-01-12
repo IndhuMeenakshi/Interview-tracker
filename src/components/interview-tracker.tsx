@@ -75,7 +75,6 @@ export function InterviewTracker() {
       addDocumentNonBlocking(jobsCollection, {
         ...newJob,
         userId: user.uid,
-        stages: [],
         status: 'Applied',
         createdAt: serverTimestamp(),
       });
