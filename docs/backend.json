@@ -1,0 +1,280 @@
+{
+  "entities": {
+    "Company": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Company",
+      "type": "object",
+      "description": "Represents a company the user has interviewed with or applied to.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Company entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the company."
+        },
+        "location": {
+          "type": "string",
+          "description": "Location of the company or the specific office."
+        },
+        "package": {
+          "type": "string",
+          "description": "Compensation package offered by the company."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Job": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Job",
+      "type": "object",
+      "description": "Represents a job applied for at a specific company.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Job entity."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to the Company entity. (Relationship: Company 1:N Job)"
+        },
+        "role": {
+          "type": "string",
+          "description": "The role or position applied for."
+        },
+        "applicationStatus": {
+          "type": "string",
+          "description": "Current status of the application (e.g., Applied, Shortlisted, Interview Scheduled)."
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "role",
+        "applicationStatus"
+      ]
+    },
+    "Interview": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Interview",
+      "type": "object",
+      "description": "Represents a specific interview event.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Interview entity."
+        },
+        "jobId": {
+          "type": "string",
+          "description": "Reference to the Job entity. (Relationship: Job 1:N Interview)"
+        },
+        "dateTime": {
+          "type": "string",
+          "description": "Date and time of the interview.",
+          "format": "date-time"
+        },
+        "mode": {
+          "type": "string",
+          "description": "Mode of the interview (e.g., online, offline)."
+        }
+      },
+      "required": [
+        "id",
+        "jobId",
+        "dateTime",
+        "mode"
+      ]
+    },
+    "InterviewRound": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InterviewRound",
+      "type": "object",
+      "description": "Represents a specific round within an interview process.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the InterviewRound entity."
+        },
+        "interviewId": {
+          "type": "string",
+          "description": "Reference to the Interview entity. (Relationship: Interview 1:N InterviewRound)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the interview round (e.g., Technical, HR, Managerial)."
+        },
+        "result": {
+          "type": "string",
+          "description": "Result of the interview round."
+        }
+      },
+      "required": [
+        "id",
+        "interviewId",
+        "name"
+      ]
+    },
+    "Document": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Document",
+      "type": "object",
+      "description": "Represents a stored document, such as a resume or offer letter.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Document entity."
+        },
+        "jobId": {
+          "type": "string",
+          "description": "Reference to the Job entity. (Relationship: Job 1:N Document)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL where the document is stored.",
+          "format": "uri"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of document (e.g., Resume, Offer Letter, Call Letter)."
+        }
+      },
+      "required": [
+        "id",
+        "jobId",
+        "url",
+        "type"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}/companies/{companyId}",
+        "definition": {
+          "entityName": "Company",
+          "schema": {
+            "$ref": "#/backend/entities/Company"
+          },
+          "description": "Stores company information for a specific user. Path-based ownership is enforced.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user."
+            },
+            {
+              "name": "companyId",
+              "description": "The ID of the company."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/jobs/{jobId}",
+        "definition": {
+          "entityName": "Job",
+          "schema": {
+            "$ref": "#/backend/entities/Job"
+          },
+          "description": "Stores job application information for a specific user. Path-based ownership is enforced.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user."
+            },
+            {
+              "name": "jobId",
+              "description": "The ID of the job application."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/jobs/{jobId}/interviews/{interviewId}",
+        "definition": {
+          "entityName": "Interview",
+          "schema": {
+            "$ref": "#/backend/entities/Interview"
+          },
+          "description": "Stores interview details for a specific job application of a user. Path-based ownership is enforced.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user."
+            },
+            {
+              "name": "jobId",
+              "description": "The ID of the job application."
+            },
+            {
+              "name": "interviewId",
+              "description": "The ID of the interview."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/jobs/{jobId}/interviews/{interviewId}/rounds/{roundId}",
+        "definition": {
+          "entityName": "InterviewRound",
+          "schema": {
+            "$ref": "#/backend/entities/InterviewRound"
+          },
+          "description": "Stores interview round information for a specific interview of a job application of a user. Path-based ownership is enforced.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user."
+            },
+            {
+              "name": "jobId",
+              "description": "The ID of the job application."
+            },
+            {
+              "name": "interviewId",
+              "description": "The ID of the interview."
+            },
+            {
+              "name": "roundId",
+              "description": "The ID of the interview round."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/jobs/{jobId}/documents/{documentId}",
+        "definition": {
+          "entityName": "Document",
+          "schema": {
+            "$ref": "#/backend/entities/Document"
+          },
+          "description": "Stores documents related to a specific job application of a user. Path-based ownership is enforced.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user."
+            },
+            {
+              "name": "jobId",
+              "description": "The ID of the job application."
+            },
+            {
+              "name": "documentId",
+              "description": "The ID of the document."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to securely manage company, job, interview, interview round, and document data for each user. The structure prioritizes authorization independence and simplifies security rules by leveraging path-based ownership and denormalization. Each user has their own collection of companies, jobs, interviews, interview rounds and documents, ensuring that only the user can access their own data.\n\nSpecifically, the data structure uses path-based ownership (`/users/{userId}/companies/{companyId}`) to associate all data with a specific user.  This eliminates the need for complex `get()` calls in security rules and enables atomic operations. For example, to fetch all companies of an specific user, you query the collection `/users/{userId}/companies`. The application also separates data with different access needs into separate collections. The structure supports the required QAPs because data is segregated by user ID, enabling secure list operations within each user's data.\n\n"
+  }
+}

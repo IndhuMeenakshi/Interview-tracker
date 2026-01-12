@@ -1,0 +1,158 @@
+/**
+ * # Core Philosophy
+ * This ruleset enforces a strict user-ownership model where all data is private
+ * to the user who created it. Access control is based on the user's
+ * authenticated ID, ensuring that a user can only interact with their own
+ * data tree.
+ *
+ * # Data Structure
+ * All application data is stored in a hierarchical structure under the `/users/{userId}`
+ * path. This creates a secure "silo" for each user's companies, job applications,
+ * interviews, and related documents. This path-based ownership is the cornerstone
+ * of the security model.
+ *
+ * # Key Security Decisions
+ * - **Strictly Private Data:** There is no public or shared data. All collections
+ *   are locked down to the owner specified in the path.
+ * - **No User Listing:** The top-level `/users` collection is not listable to
+ *   prevent enumeration of all application users.
+ * - **Path-Based Security:** Rules rely on the `{userId}` wildcard in the document
+ *   path to grant access, which is highly performant as it avoids extra database reads.
+ * - **Default Deny:** Any operation not explicitly granted is denied by default.
+ *
+ * # Denormalization for Authorization
+ * The data structure is inherently designed for simple and performant rules. By nesting
+ * all user-specific data under `/users/{userId}`, authorization checks are simple
+ * path comparisons (`isOwner(userId)`), eliminating the need for costly `get()` calls
+ * to other documents to verify ownership.
+ *
+ * # Structural Segregation
+ * This ruleset uses the ultimate form of structural segregation by giving each user
+ * their own private data tree. This model is inherently secure for list operations
+ * and prevents any possibility of one user's data leaking into another's queries.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions to promote reusable and readable rules.
+
+    /**
+     * isSignedIn
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * isOwner
+     * Validates that the requesting user's UID matches the userId from the document path.
+     * This is the primary function for enforcing data ownership.
+     * @param userId The user ID from the path.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * isExistingOwner
+     * A stricter version of isOwner used for update and delete operations.
+     * Ensures the document being modified already exists.
+     * @param userId The user ID from the path.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for the user's root document. This path is primarily a container for user-specific subcollections.
+     * @path /users/{userId}
+     * @allow A user (auth.uid: 'user_abc') can create their own user document at `/users/user_abc` (create).
+     * @deny A user (auth.uid: 'user_xyz') cannot read, update, or delete another user's document at `/users/user_abc`.
+     * @principle Restricts access to a user's own data tree and allows for self-creation of a user profile document.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Disallow listing all users.
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if false; // User documents should generally not be deletable by the user.
+
+      /**
+       * @description A user can manage the companies they have applied to.
+       * @path /users/{userId}/companies/{companyId}
+       * @allow A user (auth.uid: 'user_abc') can create a new company document in their own collection (create).
+       * @deny An anonymous user cannot read a user's company list.
+       * @principle Enforces that all company data is private and can only be managed by its owner.
+       */
+      match /companies/{companyId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description A user can manage the jobs they have applied for.
+       * @path /users/{userId}/jobs/{jobId}
+       * @allow A user (auth.uid: 'user_abc') can read, create, update, and delete their own job application entries.
+       * @deny A user (auth.uid: 'user_xyz') cannot list jobs belonging to `user_abc`.
+       * @principle Enforces that all job application data is private and can only be managed by its owner.
+       */
+      match /jobs/{jobId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+
+        /**
+         * @description A user can manage interviews associated with a specific job application.
+         * @path /users/{userId}/jobs/{jobId}/interviews/{interviewId}
+         * @allow A user (auth.uid: 'user_abc') can create an interview schedule for their own job application.
+         * @deny Another user (auth.uid: 'user_xyz') cannot view interviews for `user_abc`.
+         * @principle Secures interview data by inheriting ownership from the parent user path.
+         */
+        match /interviews/{interviewId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+
+          /**
+           * @description A user can manage the specific rounds within an interview process.
+           * @path /users/{userId}/jobs/{jobId}/interviews/{interviewId}/rounds/{roundId}
+           * @allow A user (auth.uid: 'user_abc') can update the result of their own HR round document.
+           * @deny A user cannot access interview rounds for a job application that is not theirs.
+           * @principle Secures granular interview round details by inheriting ownership from the parent user path.
+           */
+          match /rounds/{roundId} {
+            allow get: if isOwner(userId);
+            allow list: if isOwner(userId);
+            allow create: if isOwner(userId);
+            allow update: if isExistingOwner(userId);
+            allow delete: if isExistingOwner(userId);
+          }
+        }
+
+        /**
+         * @description A user can manage documents (resumes, offer letters) related to a job application.
+         * @path /users/{userId}/jobs/{jobId}/documents/{documentId}
+         * @allow A user (auth.uid: 'user_abc') can upload (create) a resume for their own job application.
+         * @deny An anonymous user cannot read any documents.
+         * @principle Secures sensitive documents by inheriting ownership from the parent user path.
+         */
+        match /documents/{documentId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+    }
+  }
+}
