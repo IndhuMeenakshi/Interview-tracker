@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useFormState } from 'react-dom';
+import React, { useState, useEffect, useMemo, useActionState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -71,7 +70,7 @@ export function InterviewCard({ job, onUpdate, onDelete }: InterviewCardProps) {
   });
 
   const initialState: FormState = { data: null, message: '' };
-  const [state, formAction] = useFormState(extractOfferInfo, initialState);
+  const [state, formAction] = useActionState(extractOfferInfo, initialState);
   
   const statusColors: { [key in Job['status']]: string } = {
     Applied: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200',
